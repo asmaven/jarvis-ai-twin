@@ -1,0 +1,16 @@
+.env
+venv/
+__pycache__/
+logs/
+reviews/
+# private or bulky — never published
+avatar/
+voices/*.onnx
+voices/*.onnx.json
+logs_server.txt
+evals/results_*.jsonl
+evals/latest.json
+*.bak
+.DS_Store
+evals/questions.jsonl
+evals/parked_questions.jsonl

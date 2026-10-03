@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+anthropic
+python-dotenv
+httpx
+piper-tts
+pillow  # only for tools/prepare_avatar.py
+onnx               # one-time: patch the voice so it reports exact phoneme timings
+imageio-ffmpeg     # tools/prepare_avatar_video.py (frames from the Memoji video)

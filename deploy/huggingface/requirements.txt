@@ -1,0 +1,8 @@
+# Runtime only (versions match the local venv that was tested).
+fastapi==0.128.8
+uvicorn[standard]==0.39.0
+anthropic==0.125.0
+python-dotenv==1.2.1
+httpx==0.28.1
+piper-tts==1.8.0
+huggingface_hub==1.8.0   # syncs conversation logs to a private dataset

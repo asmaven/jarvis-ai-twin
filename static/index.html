@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis - Ayaz's AI Twin</title>
+<style>
+  :root {
+    /* Navy & cool white: a navy Jarvis panel beside a light chat panel, on every system theme. */
+    color-scheme: light;
+    --bg: #f3f5f8; --panel: #ffffff; --text: #1c2533; --muted: #5d6879; --border: #dae0e8;
+    --accent: #1b2a41; --accent-text: #ffffff; --me: #dfe7f2; --twin: #f3f5f8; --chip: #ffffff;
+    --ring: 27, 42, 65;
+    --go: #2f9e5f; --go-hover: #278a52; --stop: #d0453b; --stop-hover: #b5372e;  /* conversation buttons */
+    /* Left (Jarvis) panel */
+    --side-bg: #1b2a41; --side-text: #ffffff; --side-muted: #b6c1d1; --side-border: #1b2a41;
+    --halo: rgba(255, 255, 255, 0.16); --side-ring: 255, 255, 255;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden;
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  /* Two panes: Jarvis stays fixed on the left; only the chat on the right scrolls. */
+  .app { display: flex; height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); max-width: 1180px; margin: 0 auto; }
+  /* Phone keyboard open: keep Jarvis, the chat, and the text box together in the space above the keyboard. */
+  body.kb-open .chips, body.kb-open .credits { display: none; }
+  .side { --av: 230px; width: 380px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
+          text-align: center; padding: 32px 28px 20px; border-right: 1px solid var(--border); overflow-y: auto; }
+  .chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 24px 28px 16px; }
+  header h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+  .controls { display: flex; flex-direction: column; align-items: center; }
+  .side .notice { margin-top: auto; padding-top: 20px; }
+  .side { background: var(--side-bg); color: var(--side-text); border-right-color: var(--side-border); --ring: var(--side-ring); }
+  .side header p, .side .notice, .side .avatar-status { color: var(--side-muted); }
+  .side a { color: var(--side-text); }
+  .notice { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+  .credits { font-size: 0.75rem; color: var(--muted); margin-top: 14px; text-align: center; }
+  .credits summary { cursor: pointer; list-style: none; display: inline; }
+  .credits summary::-webkit-details-marker { display: none; }
+  .credits summary:hover { text-decoration: underline; }
+  .credits[open] summary { display: block; margin-bottom: 2px; }
+  .mode { display: flex; gap: 8px; align-items: center; margin: 12px 0; flex-wrap: wrap; font-size: 0.9rem; }
+  .mode[hidden] { display: none; }
+  .mode input[type=password] { padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px;
+                                background: var(--panel); color: var(--text); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .chip { background: var(--chip); border: 1px solid var(--border); color: var(--text); border-radius: 16px;
+          padding: 6px 12px; font-size: 0.88rem; cursor: pointer; }
+  #log { flex: 1; min-height: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+         padding: 12px; overflow-y: auto; }
+  .msg { padding: 10px 12px; border-radius: 10px; margin: 8px 0; white-space: pre-wrap; max-width: 88%; }
+  .me { background: var(--me); margin-left: auto; }
+  .twin { background: var(--twin); }
+  .who { font-size: 0.75rem; color: var(--muted); margin-bottom: 2px; }
+  form { display: flex; gap: 8px; margin-top: 12px; align-items: flex-end; }
+  textarea { flex: 1; resize: none; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+             background: var(--panel); color: var(--text); font: inherit; min-height: 46px; }
+  button { border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; font: inherit; }
+  .send { background: var(--accent); color: var(--accent-text); }
+  a { color: var(--text); }
+  .convo { margin-top: 8px; padding: 8px 18px; border-radius: 18px; font-size: 0.9rem; }
+  .convo[hidden] { display: none; }
+  .begin { background: var(--go); color: #ffffff; }
+  .begin:hover { background: var(--go-hover); }
+  .end { background: var(--stop); color: #ffffff; }
+  .end:hover { background: var(--stop-hover); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .avatar { position: relative; width: var(--av); height: calc(var(--av) * 1.094); margin: 24px 0 6px; flex-shrink: 0; }
+  .avatar::before { content: ""; position: absolute; left: 50%; top: 54%; width: calc(var(--av) * 0.99); height: calc(var(--av) * 0.99);
+                    transform: translate(-50%, -50%); border-radius: 50%;
+                    background: radial-gradient(circle at 50% 40%, var(--halo), transparent 72%); }
+  .avatar .head { position: absolute; inset: 0; transform-origin: 50% 88%;
+                  animation: breathe 4.5s ease-in-out infinite; }
+  .avatar .frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+  .avatar .frame.visible { opacity: 1; }
+  .avatar[data-state=thinking] .head { animation: think 2.4s ease-in-out infinite; }
+  .avatar[data-state=speaking]::before { animation: glow 1.2s ease-in-out infinite; }
+  .avatar[data-state=listening]::before { box-shadow: 0 0 0 4px rgba(var(--ring), 0.18); }
+  .avatar-status { font-size: 0.85rem; color: var(--muted); min-height: 1.3em; margin-top: 2px; }
+  @keyframes breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.012); } }
+  @keyframes think { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+  @keyframes glow { 0%, 100% { box-shadow: 0 0 0 3px rgba(var(--ring), 0.22); }
+                    50% { box-shadow: 0 0 0 10px rgba(var(--ring), 0.06); } }
+  /* Phones and narrow windows: Jarvis becomes a compact strip pinned above the chat. */
+  @media (max-width: 820px) {
+    .app { flex-direction: column; }
+    .side { --av: 96px; width: auto; flex-direction: row; align-items: center; gap: 14px; text-align: left;
+            padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--border); overflow: visible; }
+    .side .avatar { margin: 0; order: -1; }
+    .side header p, .side .notice { display: none; }
+    .side header h1 { font-size: 1.05rem; margin: 0; }
+    .side-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+    /* one swipeable row of suggestions instead of a tall stack */
+    .chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 10px; padding: 0 16px; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip { flex-shrink: 0; }
+    .controls { align-items: flex-start; }
+    .avatar-status { margin-top: 0; }
+    .convo { margin-top: 4px; padding: 6px 14px; }
+    .chat { padding: 12px 16px 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .avatar .head, .avatar::before { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="avatar" id="avatar" data-state="idle">
+      <div class="head">
+        <img class="frame visible" data-frame="neutral" src="/static/avatar_video/neutral.png" alt="Jarvis, Ayaz's AI twin">
+        <img class="frame" data-frame="talk" src="/static/avatar_video/talk_on_neutral.png" alt="">
+        <img class="frame" data-frame="aa" src="/static/avatar_video/aa_on_neutral.png" alt="">
+        <img class="frame" data-frame="oo" src="/static/avatar_video/oo_on_neutral.png" alt="">
+        <img class="frame" data-frame="press" src="/static/avatar_video/press_on_neutral.png" alt="">
+        <img class="frame" data-frame="blink" src="/static/avatar_video/blink.png" alt="">
+        <img class="frame" data-frame="smile" src="/static/avatar_video/smile.png" alt="">
+      </div>
+    </div>
+    <div class="side-text">
+      <header>
+        <h1>Jarvis - Ayaz's AI Twin</h1>
+        <p>Ask about my experience in product management, operations, and building AI agents.</p>
+      </header>
+      <div class="controls">
+        <div class="avatar-status" id="avatarStatus">Press Begin Conversation to talk, or type a question.</div>
+        <button type="button" class="convo begin" id="begin" title="Turn on the mic and talk to the twin">Begin Conversation</button>
+        <button type="button" class="convo end" id="end" title="Stop talking and turn off the mic (Esc)" hidden>End Conversation</button>
+      </div>
+    </div>
+    <p class="notice">You're chatting with Jarvis, Ayaz's AI twin. Answers come only from my verified background, and conversations are saved to help improve Jarvis. For anything else, reach me on <a href="https://www.linkedin.com/in/ayazshaik" target="_blank" rel="noopener">LinkedIn</a>.</p>
+  </aside>
+
+  <main class="chat">
+    <div class="mode" id="privateMode" hidden>
+      <label><input type="checkbox" id="privateToggle"> Private mode (Ayaz only)</label>
+      <input type="password" id="passcode" placeholder="Passcode" hidden>
+    </div>
+
+    <div class="chips" id="chips">
+      <button class="chip">What do you do at Amazon?</button>
+      <button class="chip">Tell me about Rootify.</button>
+      <button class="chip">What warehouse automation have you worked on?</button>
+      <button class="chip">How do you use AI in your work?</button>
+    </div>
+
+    <div id="log" aria-live="polite"></div>
+
+    <form id="form">
+      <textarea id="input" rows="2" placeholder="Ask me anything about my work…" maxlength="2000"></textarea>
+      <button type="submit" class="send" id="send">Send</button>
+    </form>
+    <details class="credits">
+      <summary>Voice credits</summary>
+      Voice: Piper "hfc_male" (Hi-Fi-CAPTAIN dataset, NICT), <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a>.
+    </details>
+  </main>
+</div>
+
+<script>
+const log = document.getElementById("log");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const privateToggle = document.getElementById("privateToggle");
+const passcode = document.getElementById("passcode");
+const sessionId = crypto.randomUUID();
+const ACCESS_KEY = new URLSearchParams(location.search).get("key") || "";  // from the shared link
+// Ayaz's own browsers: opening the ?private link once marks this browser as his, so even the normal link logs his
+// tests as owner and the review leaves them out. It changes nothing about the answers.
+const OWNER = (() => {
+  const viaLink = new URLSearchParams(location.search).has("private");
+  try {
+    if (viaLink) localStorage.setItem("jarvis_owner", "1");
+    return localStorage.getItem("jarvis_owner") === "1";
+  } catch (e) { return viaLink; }
+})();
+
+// Phones: when the keyboard opens, iPhone Safari shrinks the visible area and scrolls the page, pushing Jarvis
+// off the top. Size the layout to the visible area and keep it pinned to the top instead.
+if (window.visualViewport) {
+  const fitToVisibleArea = () => {
+    const vv = window.visualViewport;
+    document.documentElement.style.setProperty("--app-h", `${Math.round(vv.height)}px`);
+    document.body.classList.toggle("kb-open", vv.height < window.innerHeight * 0.8);  // keyboard covers 20%+
+    window.scrollTo(0, 0);
+    log.scrollTop = log.scrollHeight;
+  };
+  window.visualViewport.addEventListener("resize", fitToVisibleArea);
+  window.visualViewport.addEventListener("scroll", fitToVisibleArea);
+  fitToVisibleArea();
+}
+
+// One anonymous page view per load (referring site only); run by the browser, so link previews don't count.
+if (location.protocol !== "file:") {
+  fetch("/api/visit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Twin-Key": ACCESS_KEY },
+    body: JSON.stringify({ session_id: sessionId, owner: OWNER, referrer: document.referrer }),
+  }).catch(() => {});
+}
+const history = [];
+const beginBtn = document.getElementById("begin");
+const endBtn = document.getElementById("end");
+// iPhone/iPad Safari only lets the mic start from a tap, so they get "Tap to talk" instead of hands-free listening.
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+var micReady = false;  // set once the speech recognizer below is set up
+let chatAbort = null;
+let conversationOn = false;  // set by Begin Conversation; the mic only listens while it's on
+const GREETING = "Hi, I'm Jarvis, Ayaz's AI twin. Ask me anything about my work.";
+const speakAnswers = true;   // answers are always spoken
+
+// Private mode is only for Ayaz: its controls appear only at /?private, so visitors never see them.
+document.getElementById("privateMode").hidden = !new URLSearchParams(location.search).has("private");
+privateToggle.addEventListener("change", () => { passcode.hidden = !privateToggle.checked; });
+
+addMessage("assistant", GREETING);
+
+if (location.protocol === "file:") {
+  addMessage("assistant", "This page was opened as a file, so it can't reach the twin's server. " +
+    "Start the server and open http://localhost:8010 instead.");
+  sendBtn.disabled = true;
+}
+
+function addMessage(role, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + (role === "user" ? "me" : "twin");
+  div.innerHTML = `<div class="who">${role === "user" ? "You" : "Jarvis"}</div>`;
+  const body = document.createElement("div");
+  body.textContent = text;
+  div.appendChild(body);
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return body;
+}
+
+async function ask(question) {
+  question = question.trim();
+  if (!question) return;
+  history.push({ role: "user", content: question });
+  addMessage("user", question);
+  input.value = "";
+  sendBtn.disabled = true;
+  pauseListening();
+  stopSpeaking();
+  spokenUpTo = 0;
+  setAvatarState("thinking");
+  const out = addMessage("assistant", "…");
+  let answer = "";
+  const abort = new AbortController();
+  chatAbort = abort;
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      signal: abort.signal,
+      headers: { "Content-Type": "application/json", "X-Twin-Key": ACCESS_KEY },
+      body: JSON.stringify({
+        messages: history,
+        mode: privateToggle.checked ? "private" : "public",
+        passcode: passcode.value,
+        session_id: sessionId,
+        owner: OWNER,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Request failed (${res.status})`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      answer += decoder.decode(value, { stream: true });
+      if (!speakAnswers && !flapTimer) { setAvatarState("speaking"); startFlapping(); }
+      out.textContent = answer;
+      speakNewSentences(answer, false);
+      log.scrollTop = log.scrollHeight;
+    }
+    history.push({ role: "assistant", content: answer });
+    speakNewSentences(answer, true);
+    if (speakAnswers) {
+      const epochAtEnd = audioEpoch;
+      audioQueue.then(() => { if (epochAtEnd === audioEpoch) finishTalking(); });
+    } else {
+      finishTalking();
+    }
+  } catch (e) {
+    if (abort.signal.aborted) {  // the visitor pressed End Conversation; endConversation() already reset the avatar
+      if (answer) {
+        out.textContent = answer + " …";
+        history.push({ role: "assistant", content: answer });
+      } else {
+        out.textContent = "(stopped)";
+        history.pop();
+      }
+      return;
+    }
+    out.textContent = e.message;
+    stopFlapping();
+    setAvatarState("idle");
+    history.pop();  // drop the unanswered question so the next request stays valid
+    resumeListening();
+  } finally {
+    if (chatAbort === abort) chatAbort = null;
+    sendBtn.disabled = false;
+  }
+}
+
+let greeted = false;
+function beginConversation() {
+  conversationOn = true;
+  if (IOS) {  // iPhone: open the keyboard now so its 🎤 (Apple dictation) is one tap away for every question
+    input.placeholder = "Tap the 🎤 on your keyboard, speak, then tap Send";
+    input.focus();
+  }
+  if (greeted) { twinBusy = false; setAvatarState("idle"); startListening(); return; }
+  greeted = true;  // say hello out loud once, then start listening
+  pauseListening();
+  stopSpeaking();
+  speakChunk(GREETING);
+  const epoch = audioEpoch;
+  audioQueue.then(() => { if (epoch === audioEpoch) finishTalking(); });
+}
+
+// Cancel any answer in progress, cut the voice, and turn the mic off until Begin is pressed again.
+function endConversation() {
+  conversationOn = false;
+  if (chatAbort) { chatAbort.abort(); chatAbort = null; }
+  stopSpeaking();
+  if (rec && micListening) rec.abort();
+  twinBusy = false;
+  setAvatarState("idle");
+}
+beginBtn.addEventListener("click", beginConversation);
+endBtn.addEventListener("click", endConversation);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !endBtn.hidden) endConversation(); });
+
+document.getElementById("form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  sendQuestion();
+});
+// iPhone: close the keyboard on send so dictation fully ends; while it stays open iOS keeps audio in call mode
+// (earpiece, call volume) even when the page asks for media playback. Tap the text box to ask the next question.
+function sendQuestion() {
+  if (IOS) { input.blur(); micEvent("send_blur"); }
+  ask(input.value);
+}
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuestion(); }
+});
+document.getElementById("chips").addEventListener("click", (e) => {
+  if (e.target.classList.contains("chip")) ask(e.target.textContent);
+});
+
+// ---------- Animated avatar: blink, breathe, lip-sync to the voice ----------
+const avatarEl = document.getElementById("avatar");
+const avatarStatus = document.getElementById("avatarStatus");
+const frameEls = {};
+// Frames come from the Memoji video (static/avatar_video/) by default; add ?frames=photos to the URL for the
+// older screenshot-based frames (static/avatar/).
+const FRAME_DIR = new URLSearchParams(location.search).get("frames") === "photos" ? "/static/avatar/" : "/static/avatar_video/";
+avatarEl.querySelectorAll(".frame").forEach((img) => {
+  frameEls[img.dataset.frame] = img;
+  img.src = FRAME_DIR + img.getAttribute("src").split("/").pop();
+});
+const avatar = { viseme: "R", blinking: false, expression: null };
+// Mouth shape (from the server's phoneme timeline) -> avatar frame.
+// R rest · M lips pressed · A wide open · O rounded · E stretched · F teeth on lip · H half open
+const VISEME_FRAME = { R: "neutral", M: "press", A: "aa", O: "oo", H: "talk", E: "talk", F: "press" };
+const STATUS = { idle: "Press Begin Conversation to talk, or type a question.", listening: "Listening… just ask.",
+                 thinking: "Thinking…", speaking: "" };
+let micListening = false;
+
+function renderAvatar() {
+  let name = avatar.expression || VISEME_FRAME[avatar.viseme] || "neutral";
+  if (avatar.blinking && avatar.viseme === "R" && !avatar.expression) name = "blink";
+  for (const [key, img] of Object.entries(frameEls)) img.classList.toggle("visible", key === name);
+}
+
+function setAvatarState(state) {
+  if (state === "idle" && micListening) state = "listening";
+  avatarEl.dataset.state = state;
+  const busy = state === "thinking" || state === "speaking";
+  beginBtn.hidden = conversationOn || busy;
+  endBtn.hidden = !conversationOn && !busy;
+  avatarStatus.textContent = STATUS[state] ?? "";
+  updateTalkButton(state);
+}
+
+function smileBriefly(ms = 1400) {
+  avatar.expression = "smile";
+  renderAvatar();
+  setTimeout(() => { avatar.expression = null; renderAvatar(); }, ms);
+}
+
+(function blinkLoop() {  // blink at natural, random intervals
+  setTimeout(() => {
+    if (avatar.viseme === "R" && !avatar.expression) {
+      avatar.blinking = true;
+      renderAvatar();
+      setTimeout(() => { avatar.blinking = false; renderAvatar(); }, 140);
+    }
+    blinkLoop();
+  }, 2500 + Math.random() * 3500);
+})();
+
+// Speech-like mouth movement when there's no audio to follow (voice off, or browser fallback voice).
+let flapTimer = null;
+function startFlapping() {
+  if (flapTimer) return;
+  flapTimer = setInterval(() => {
+    const shapes = ["H", "A", "E", "O", "H", "M", "A", "R"];
+    avatar.viseme = shapes[Math.floor(Math.random() * shapes.length)];
+    renderAvatar();
+  }, 170);
+}
+function stopFlapping() {
+  clearInterval(flapTimer);
+  flapTimer = null;
+  avatar.viseme = "R";
+  renderAvatar();
+}
+
+// Real lip-sync: follow the server's mouth-shape timeline against the clip's playback position.
+let lipRaf = null;
+const LIP_LEAD_MS = 40;  // show each shape a hair early; lips move slightly before the sound
+function startLipSync(audio, timeline) {
+  stopLipSync();
+  let idx = 0;
+  const tick = () => {
+    const t = audio.currentTime * 1000 + LIP_LEAD_MS;
+    while (idx + 1 < timeline.length && timeline[idx + 1][0] <= t) idx++;
+    const shape = timeline.length && t >= timeline[0][0] ? timeline[idx][1] : "R";
+    if (shape !== avatar.viseme) { avatar.viseme = shape; renderAvatar(); }
+    lipRaf = requestAnimationFrame(tick);
+  };
+  lipRaf = requestAnimationFrame(tick);
+}
+function stopLipSync() {
+  cancelAnimationFrame(lipRaf);
+  lipRaf = null;
+  avatar.viseme = "R";
+  renderAvatar();
+}
+
+function finishTalking() {
+  stopFlapping();
+  stopLipSync();
+  releasePlayer();
+  setAvatarState("idle");
+  smileBriefly();
+  resumeListening();
+}
+
+setTimeout(() => smileBriefly(1600), 400);  // friendly greeting on load
+
+// ---------- Voice output: natural male voice (Piper on the server), sentence-by-sentence ----------
+const PIPER = "__piper__";
+// Browser voices are only a fallback; "(Enhanced)"/"(Premium)" macOS voices sound least robotic.
+const PREFERRED_MALE_VOICES = [
+  "Microsoft Andrew", "Microsoft Brian", "Microsoft Guy", "Evan (Premium)", "Evan (Enhanced)",
+  "Nathan (Premium)", "Nathan (Enhanced)", "Tom (Enhanced)", "Aaron (Enhanced)", "Alex", "Evan",
+  "Nathan", "Tom", "Aaron", "Daniel", "Google UK English Male",
+];
+let voices = [];
+let fallbackVoice = null;
+const selectedVoice = PIPER;  // Piper "hfc_male" on the server; browser voice only as a fallback
+let spokenUpTo = 0;
+let audioQueue = Promise.resolve();
+let audioEpoch = 0;
+let currentAudio = null;
+
+function loadVoices() {
+  voices = ("speechSynthesis" in window) ? speechSynthesis.getVoices().filter(v => v.lang.startsWith("en")) : [];
+  const byName = (name) => voices.find(v => v.name === name || v.name.startsWith(name));
+  fallbackVoice = PREFERRED_MALE_VOICES.map(byName).find(Boolean) || voices[0] || null;
+}
+
+loadVoices();
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = loadVoices;
+
+// Only used for browser voices; the server applies the same rewrites before synthesizing.
+function forSpeech(text) {
+  return text
+    .replace(/\*\*|__|`|#+\s/g, "")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/\$(\d+(?:\.\d+)?)\s?MM\+?/g, "$1 million dollars plus")
+    .replace(/\$(\d+(?:\.\d+)?)\s?K\+?/g, "$1 thousand dollars")
+    .replace(/(\d+)\+/g, "$1 plus")
+    .replace(/\bYoY\b/g, "year over year")
+    .replace(/≥/g, "at least ")
+    .replace(/\be\.g\./gi, "for example")
+    .replace(/\bi\.e\./gi, "that is")
+    .replace(/\bn8n\b/gi, "n eight n")
+    .replace(/\bSr\./g, "Senior")
+    .replace(/\bayaz\b/gi, "Ah-yahz")  // also inside the email address
+    .replace(/https?:\/\/\S+|\b(?:www\.)?linkedin\.com\/in\/\S+/gi, "my LinkedIn profile")
+    .replace(/\s[—–]\s|—/g, ", ")
+    .replace(/\s{2,}/g, " ");
+}
+
+function browserSpeak(text) {
+  const voice = fallbackVoice;
+  const clean = forSpeech(text).trim();
+  if (!clean || !voice || !("speechSynthesis" in window)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const u = new SpeechSynthesisUtterance(clean);
+    u.voice = voice;
+    u.lang = voice.lang;
+    u.onstart = () => { setAvatarState("speaking"); startFlapping(); };
+    u.onend = u.onerror = () => { stopFlapping(); resolve(); };
+    speechSynthesis.speak(u);
+  });
+}
+
+// iPhone Safari only plays sound from an audio element that was first started by a tap, so every sentence reuses
+// this one player (unlocked in unlockAudio) instead of creating a new Audio each time.
+const player = new Audio();
+player.preload = "auto";
+
+// After an answer, clear and reset the player so iPhone switches its audio system from playback back to
+// recording; a paused player keeps it in playback mode and the next mic session captures silence.
+function releasePlayer() {
+  if (!IOS) return;
+  player.pause();
+  player.removeAttribute("src");
+  player.load();
+}
+
+// iPhone: after keyboard dictation, iOS can leave audio in call mode (earpiece, call volume). Newer Safari's
+// Audio Session API lets the page say "this is media playback", which routes sound back to the loudspeaker.
+function useSpeakerAudio() {
+  if (!IOS) return;
+  const session = navigator.audioSession;
+  if (!session) { micEvent("audio_session", "unsupported"); return; }
+  const before = session.type;
+  try { session.type = "playback"; } catch (e) { /* older Safari */ }
+  micEvent("audio_session", `${before}->${session.type}`);
+}
+
+function playBlob(blob, timeline) {
+  useSpeakerAudio();
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const audio = player;
+    audio.src = url;
+    currentAudio = audio;
+    audio.onplay = () => {
+      setAvatarState("speaking");
+      if (timeline.length) startLipSync(audio, timeline); else startFlapping();
+    };
+    audio.onended = audio.onerror = () => { stopLipSync(); stopFlapping(); URL.revokeObjectURL(url); resolve(); };
+    audio.play().catch(() => { stopLipSync(); stopFlapping(); resolve(); });
+  });
+}
+
+function speakChunk(text) {
+  if (!text.trim()) return;
+  const epoch = audioEpoch;
+  // Start synthesizing now (in parallel), but play strictly in order.
+  const audioReady = selectedVoice === PIPER
+    ? fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json", "X-Twin-Key": ACCESS_KEY },
+                          body: JSON.stringify({ text }) })
+        .then(async (r) => {
+          if (!r.ok) return null;
+          let timeline = [];
+          try { timeline = JSON.parse(r.headers.get("X-Visemes") || "[]"); } catch (e) {}
+          return { blob: await r.blob(), timeline };
+        }).catch(() => null)
+    : Promise.resolve(null);
+  audioQueue = audioQueue.then(async () => {
+    if (epoch !== audioEpoch) return;
+    const clip = await audioReady;
+    if (epoch !== audioEpoch) return;
+    if (clip) await playBlob(clip.blob, clip.timeline);
+    else await browserSpeak(text);  // browser voice chosen, or the server voice failed
+  });
+}
+
+function stopSpeaking() {
+  audioEpoch++;
+  audioQueue = Promise.resolve();
+  if (currentAudio) { currentAudio.pause(); currentAudio.onended = currentAudio.onerror = null; currentAudio = null; }
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  stopLipSync();
+  stopFlapping();
+}
+
+// Speak each finished sentence as soon as it streams in; flush the remainder at the end.
+function speakNewSentences(fullText, final) {
+  if (!speakAnswers) return;
+  if (IOS) {  // iPhone: one clip per answer, so playback never switches clips (and volume) mid-answer
+    if (final && spokenUpTo < fullText.length) { speakChunk(fullText.slice(spokenUpTo)); spokenUpTo = fullText.length; }
+    return;
+  }
+  const pending = fullText.slice(spokenUpTo);
+  // A sentence ends at . ! ? followed by whitespace and a capital letter (or quote/bracket), or at a line break, so
+  // "M.S. in" or "e.g. for" stay whole. Walk the boundaries in order so dots inside emails, web addresses, and
+  // decimals never make the text before them get skipped.
+  const re = /[.!?]+(?=\s+["'(\u201c\u2018A-Z0-9])|\n/g;
+  let consumed = 0;
+  while (re.exec(pending) !== null) {
+    speakChunk(pending.slice(consumed, re.lastIndex));
+    consumed = re.lastIndex;
+  }
+  spokenUpTo += consumed;
+  if (final && spokenUpTo < fullText.length) {
+    speakChunk(fullText.slice(spokenUpTo));
+    spokenUpTo = fullText.length;
+  }
+}
+
+// Browsers block audio until the visitor interacts with the page once; a silent play on the first
+// click or keypress unlocks it so spoken answers can play after voice questions.
+function unlockAudio() {
+  player.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  player.play().catch(() => {});
+  document.removeEventListener("pointerdown", unlockAudio);
+  document.removeEventListener("keydown", unlockAudio);
+}
+document.addEventListener("pointerdown", unlockAudio);
+document.addEventListener("keydown", unlockAudio);
+
+// ---------- Conversation mic: after Begin Conversation, listen whenever the twin isn't thinking or speaking ----------
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+let twinBusy = false;
+let micBlocked = !Recognition;
+
+function startListening() {
+  if (IOS) { updateTalkButton(avatarEl.dataset.state); return; }  // iPhone/iPad: keyboard dictation via "Tap to talk"
+  if (!rec || !conversationOn || twinBusy || micBlocked || micListening) return;
+  try { rec.start(); } catch (e) { /* already starting */ }
+}
+
+function updateTalkButton(state) {
+  if (!micReady) return;
+  const busy = state === "thinking" || state === "speaking";
+  if (IOS && conversationOn && !busy && !twinBusy) avatarStatus.textContent = "Tap the text box, then the 🎤 on your keyboard to ask.";
+}
+
+
+function pauseListening() {
+  twinBusy = true;
+  if (rec && micListening) rec.abort();  // don't let the twin hear itself
+}
+function resumeListening() {
+  twinBusy = false;
+  setTimeout(startListening, 300);
+}
+
+// iPhone only: report each mic step to the server log so problems there can be diagnosed remotely.
+function micEvent(name, detail = "") {
+  if (!IOS) return;
+  fetch("/api/event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Twin-Key": ACCESS_KEY },
+    body: JSON.stringify({ name, detail: String(detail).slice(0, 120), session_id: sessionId }),
+  }).catch(() => {});
+}
+
+let heard = "", sent = false, silenceTimer = null, startWatchdog = null;
+function sendHeard() {
+  clearTimeout(silenceTimer);
+  if (sent || !heard) return false;
+  sent = true;
+  ask(heard);
+  return true;
+}
+
+// iPhone Safari often can't restart a recognizer that has already run, so on iPhone each tap gets a fresh one.
+// Events from a replaced recognizer are ignored (r !== rec).
+function createRecognizer() {
+  const r = new Recognition();
+  r.lang = "en-US";
+  // iPhone Safari often never marks words as final, so there we keep the latest words heard and send them
+  // after a short pause instead of waiting for a final result that may not come.
+  r.interimResults = IOS;
+  r.onstart = () => {
+    if (r !== rec) return;
+    clearTimeout(startWatchdog);
+    heard = ""; sent = false;
+    micListening = true;
+    micEvent("onstart");
+    if (avatarEl.dataset.state === "idle") setAvatarState("idle");
+    if (IOS) {
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        if (r !== rec || heard) return;
+        micEvent("no_words_8s");
+        try { r.abort(); } catch (err) { /* already stopped */ }
+      }, 8000);
+    }
+  };
+  r.onresult = (e) => {
+    if (r !== rec) return;
+    heard = Array.from(e.results).map((x) => x[0].transcript).join(" ").trim();
+    if (e.results[e.results.length - 1].isFinal) { sendHeard(); return; }
+    clearTimeout(silenceTimer);  // still talking: wait for a ~1.2 s pause, then finish
+    silenceTimer = setTimeout(() => { try { r.stop(); } catch (err) { /* already stopped */ } }, 1200);
+  };
+  r.onerror = (e) => {
+    if (r !== rec) return;
+    micEvent("onerror", e.error);
+    if (e.error === "audio-capture" && IOS) avatarStatus.textContent = "The mic is busy. Tap to talk again.";
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      micBlocked = true;
+      STATUS.idle = IOS
+        ? "Voice is off: on iPhone, allow Microphone and Speech Recognition for Safari in Settings, or type below."
+        : "Microphone is blocked — allow it in the browser to talk, or type below.";
+      setAvatarState("idle");
+    }
+  };
+  r.onend = () => {
+    if (r !== rec) return;
+    micListening = false;
+    micEvent("onend", `heard=${heard.length} sent=${sent}`);
+    if (sendHeard()) return;  // words were heard but never marked final (common on iPhone): send them now
+    if (avatarEl.dataset.state === "listening") setAvatarState("idle");
+    if (IOS) {  // iPhone/iPad: next turn starts with a tap
+      updateTalkButton(avatarEl.dataset.state);
+      if (!sent && !micBlocked && conversationOn && !twinBusy) avatarStatus.textContent = "Didn't catch that. Tap to talk again.";
+    } else setTimeout(startListening, 300);  // keep listening after silence or a timeout
+  };
+  return r;
+}
+
+// iPhone Safari's built-in speech recognition stops capturing sound after the page plays audio (diagnosed
+// 2026-10-03), so iPhone uses the keyboard's own dictation instead; desktop keeps hands-free listening.
+if (Recognition && !IOS) rec = createRecognizer();
+
+micReady = true;
+</script>
+</body>
+</html>
