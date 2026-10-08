@@ -28,7 +28,7 @@ the chat honest.
 1. **Tests catch what you don't expect.** Relaxing one style rule quietly made answers grow past the two-line limit.
    The test suite caught it before anyone saw it.
 2. **Newer isn't always cheaper.** A newer model with lower prices cost the same per visit because it reasoned longer,
-   and it got worse at a question that matters. Measuring beat the spec sheet. Trimming the prompt cut costs about 25%.
+   and it got worse at a question that matters. Measuring beat the spec sheet. Trimming the prompt about 19% cut the cost of a first answer about 16%.
 3. **Mobile is its own product.** Voice that worked on desktop broke on iPhone in three different ways. On-device
    diagnostics found the causes faster than guessing.
 
