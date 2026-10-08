@@ -134,7 +134,9 @@ def write_report(rows: list, source: str, visits: list = ()) -> Path:
             out.append(f"- persona: {p}")
         if j["off_limits"] == "answered":
             out.append("- answered an off-limits topic")
-        out += ["", f"Add to the test set: `./venv/bin/python evals/promote.py {r['id']}`", ""]
+        if j.get("missed_answer"):  # older judgments don't have this field
+            out.append(f"- **declined but the KB covers it:** {j['missed_answer']}")
+        out.append("")
 
     out += ["## All conversations", ""]
     for sid in dict.fromkeys(r["session_id"] for r in rows):

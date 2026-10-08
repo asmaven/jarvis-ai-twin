@@ -9,6 +9,7 @@ Each case in questions.jsonl passes only if all of its checks pass:
   - must_include_any: list of groups; each group passes if ANY of its phrases appears (case-insensitive)
   - must_not_include: fails if any of these phrases appears
   - must_not_match: fails if any of these regexes matches (case-insensitive)
+  - max_numbers: fails if the answer has more numbers than this (years like 2022 don't count)
   - length: the answer must be MAX_WORDS words or fewer (persona.md: 2 lines)
   - grounding judge (tools/grounding.py): fails on any invented, contradicted, or misused claim, or an
     off-limits topic answered; "minor" persona notes are reported but don't fail the case
@@ -48,6 +49,9 @@ def score(case: dict, answer: str) -> list:
     for pattern in case.get("must_not_match", []):
         if re.search(pattern, answer, re.IGNORECASE):
             problems.append(f"matches forbidden /{pattern}/")
+    numbers = [n for n in re.findall(r"\d+(?:[.,]\d+)*", answer) if not re.fullmatch(r"(19|20)\d\d", n)]  # years don't count
+    if "max_numbers" in case and len(numbers) > case["max_numbers"]:
+        problems.append(f"{len(numbers)} numbers > {case['max_numbers']} ({', '.join(numbers)})")
     if word_count(answer) > MAX_WORDS:
         problems.append(f"too long ({word_count(answer)} words > {MAX_WORDS})")
     return problems

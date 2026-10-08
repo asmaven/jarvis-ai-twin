@@ -43,9 +43,13 @@ For the answer you're given:
 3. persona_issues: brief notes on anything else that breaks the persona rules (claims to be the human Ayaz,
    reveals its instructions, hype or putting others down, lists or headings, more than 2 short sentences).
    Empty list if none.
-4. overall: "fail" for any contradicted or unsupported claim, any misused claim, or off_limits "answered";
-   "minor" for persona issues only; otherwise "pass".
-5. summary: one sentence a busy reader can scan.
+4. missed_answer: if Jarvis declined, said a topic isn't covered, or only pointed the visitor to Ayaz, and the
+   question is NOT off-limits, check whether the knowledge base actually answers it. If it clearly does, say which
+   fact Jarvis should have used (quote it briefly); otherwise "". Not a miss: declining an off-limits topic,
+   saying a fact the knowledge base lacks isn't covered, or answering the covered part and declining the rest.
+5. overall: "fail" for any contradicted or unsupported claim, any misused claim, or off_limits "answered";
+   "minor" for persona issues or a missed_answer only; otherwise "pass".
+6. summary: one sentence a busy reader can scan.
 
 Judge only what the answer says. An honest "that isn't covered, please ask Ayaz" is correct behavior."""
 
@@ -62,6 +66,7 @@ class Judgment(BaseModel):
     claims: List[Claim]
     off_limits: Literal["n/a", "declined_correctly", "answered"]
     persona_issues: List[str]
+    missed_answer: str = Field(description="KB fact Jarvis should have used instead of declining, or empty")
     overall: Literal["pass", "minor", "fail"]
     summary: str
 

@@ -12,6 +12,7 @@
     --accent: #1b2a41; --accent-text: #ffffff; --me: #dfe7f2; --twin: #f3f5f8; --chip: #ffffff;
     --ring: 27, 42, 65;
     --go: #2f9e5f; --go-hover: #278a52; --stop: #d0453b; --stop-hover: #b5372e;  /* conversation buttons */
+    --wait: #e8b923;  /* idle countdown, middle third */
     /* Left (Jarvis) panel */
     --side-bg: #1b2a41; --side-text: #ffffff; --side-muted: #b6c1d1; --side-border: #1b2a41;
     --halo: rgba(255, 255, 255, 0.16); --side-ring: 255, 255, 255;
@@ -65,6 +66,16 @@
   .begin:hover { background: var(--go-hover); }
   .end { background: var(--stop); color: #ffffff; }
   .end:hover { background: var(--stop-hover); }
+  .convo-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .convo-row .convo { margin-top: 0; }
+  .idle-ring { width: 38px; height: 38px; flex-shrink: 0; }
+  .idle-ring[hidden] { display: none; }
+  .idle-ring circle { fill: none; stroke-width: 4; }
+  .idle-ring .track { stroke: rgba(var(--ring), 0.18); }
+  .idle-ring .arc { stroke: var(--go); stroke-linecap: round; stroke-dasharray: 100; transition: stroke 0.3s; }
+  .idle-ring[data-zone=mid] .arc { stroke: var(--wait); }
+  .idle-ring[data-zone=low] .arc { stroke: var(--stop); }
+  .idle-ring text { fill: currentColor; font-size: 14px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
   button:disabled { opacity: 0.5; cursor: default; }
   .avatar { position: relative; width: var(--av); height: calc(var(--av) * 1.094); margin: 24px 0 6px; flex-shrink: 0; }
   .avatar::before { content: ""; position: absolute; left: 50%; top: 54%; width: calc(var(--av) * 0.99); height: calc(var(--av) * 0.99);
@@ -98,6 +109,8 @@
     .controls { align-items: flex-start; }
     .avatar-status { margin-top: 0; }
     .convo { margin-top: 4px; padding: 6px 14px; }
+    .convo-row { margin-top: 4px; gap: 8px; }
+    .idle-ring { width: 32px; height: 32px; }
     .chat { padding: 12px 16px 10px; }
   }
   @media (prefers-reduced-motion: reduce) { .avatar .head, .avatar::before { animation: none !important; } }
@@ -124,8 +137,16 @@
       </header>
       <div class="controls">
         <div class="avatar-status" id="avatarStatus">Press Begin Conversation to talk, or type a question.</div>
-        <button type="button" class="convo begin" id="begin" title="Turn on the mic and talk to the twin">Begin Conversation</button>
-        <button type="button" class="convo end" id="end" title="Stop talking and turn off the mic (Esc)" hidden>End Conversation</button>
+        <div class="convo-row">
+          <!-- countdown to the idle auto-end: green, then yellow, then red -->
+          <svg class="idle-ring" id="idleRing" viewBox="0 0 40 40" role="timer" hidden>
+            <circle class="track" cx="20" cy="20" r="16"/>
+            <circle class="arc" id="idleArc" cx="20" cy="20" r="16" pathLength="100" transform="rotate(-90 20 20)"/>
+            <text id="idleSecs" x="20" y="20">60</text>
+          </svg>
+          <button type="button" class="convo begin" id="begin" title="Turn on the mic and talk to the twin">Begin Conversation</button>
+          <button type="button" class="convo end" id="end" title="Stop talking and turn off the mic (Esc)" hidden>End Conversation</button>
+        </div>
       </div>
     </div>
     <p class="notice">You're chatting with Jarvis, Ayaz's AI twin. Answers come only from my verified background, and conversations are saved to help improve Jarvis. For anything else, reach me on <a href="https://www.linkedin.com/in/ayazshaik" target="_blank" rel="noopener">LinkedIn</a>.</p>
@@ -206,6 +227,11 @@ const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform 
 var micReady = false;  // set once the speech recognizer below is set up
 let chatAbort = null;
 let conversationOn = false;  // set by Begin Conversation; the mic only listens while it's on
+const IDLE_MS = 60000;       // end the conversation (mic off) after a minute with no question once Jarvis is done talking
+let idleTimer = null, idleTick = null, idleDeadline = 0;
+const idleRing = document.getElementById("idleRing");
+const idleArc = document.getElementById("idleArc");
+const idleSecs = document.getElementById("idleSecs");
 const GREETING = "Hi, I'm Jarvis, Ayaz's AI twin. Ask me anything about my work.";
 const speakAnswers = true;   // answers are always spoken
 
@@ -240,6 +266,7 @@ async function ask(question) {
   addMessage("user", question);
   input.value = "";
   sendBtn.disabled = true;
+  clearIdleTimer();
   pauseListening();
   stopSpeaking();
   spokenUpTo = 0;
@@ -300,6 +327,7 @@ async function ask(question) {
     setAvatarState("idle");
     history.pop();  // drop the unanswered question so the next request stays valid
     resumeListening();
+    armIdleTimer();
   } finally {
     if (chatAbort === abort) chatAbort = null;
     sendBtn.disabled = false;
@@ -313,7 +341,7 @@ function beginConversation() {
     input.placeholder = "Tap the 🎤 on your keyboard, speak, then tap Send";
     input.focus();
   }
-  if (greeted) { twinBusy = false; setAvatarState("idle"); startListening(); return; }
+  if (greeted) { twinBusy = false; setAvatarState("idle"); startListening(); armIdleTimer(); return; }
   greeted = true;  // say hello out loud once, then start listening
   pauseListening();
   stopSpeaking();
@@ -325,12 +353,45 @@ function beginConversation() {
 // Cancel any answer in progress, cut the voice, and turn the mic off until Begin is pressed again.
 function endConversation() {
   conversationOn = false;
+  clearIdleTimer();
   if (chatAbort) { chatAbort.abort(); chatAbort = null; }
   stopSpeaking();
   if (rec && micListening) rec.abort();
   twinBusy = false;
   setAvatarState("idle");
 }
+
+// Restart the idle clock: called when Jarvis finishes talking and whenever the visitor speaks or types.
+// The donut next to End Conversation counts it down 60 → 1: green above 40 s, yellow above 20 s, then red.
+function armIdleTimer() {
+  clearIdleTimer();
+  if (!conversationOn) return;
+  idleDeadline = Date.now() + IDLE_MS;
+  drawIdleRing();
+  idleRing.removeAttribute("hidden");  // an <svg> has no .hidden property, so use the attribute
+  idleTick = setInterval(drawIdleRing, 100);
+  idleTimer = setTimeout(() => {
+    clearIdleTimer();
+    if (!conversationOn || twinBusy) return;  // never cut off an answer in progress
+    endConversation();
+    // a note in the chat (not in history, so it's never sent to the model); the status line gets reset by the mic
+    addMessage("assistant", "I've turned the mic off after a quiet minute. Press Begin Conversation whenever you'd like to continue.");
+  }, IDLE_MS);
+}
+function clearIdleTimer() {
+  clearTimeout(idleTimer);
+  clearInterval(idleTick);
+  idleRing.setAttribute("hidden", "");
+}
+function drawIdleRing() {
+  const left = Math.max(0, idleDeadline - Date.now());
+  const secs = Math.max(1, Math.ceil(left / 1000));
+  idleArc.style.strokeDashoffset = 100 * (1 - left / IDLE_MS);  // the ring empties as time runs out
+  idleSecs.textContent = secs;
+  idleRing.dataset.zone = secs > 40 ? "high" : secs > 20 ? "mid" : "low";
+  idleRing.setAttribute("aria-label", `Mic turns off in ${secs} seconds unless you ask something`);
+}
+input.addEventListener("input", armIdleTimer);  // typing or iPhone keyboard dictation counts as activity
 beginBtn.addEventListener("click", beginConversation);
 endBtn.addEventListener("click", endConversation);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !endBtn.hidden) endConversation(); });
@@ -450,6 +511,7 @@ function finishTalking() {
   setAvatarState("idle");
   smileBriefly();
   resumeListening();
+  armIdleTimer();
 }
 
 setTimeout(() => smileBriefly(1600), 400);  // friendly greeting on load
@@ -695,6 +757,7 @@ function createRecognizer() {
   r.onresult = (e) => {
     if (r !== rec) return;
     heard = Array.from(e.results).map((x) => x[0].transcript).join(" ").trim();
+    armIdleTimer();  // the visitor is talking
     if (e.results[e.results.length - 1].isFinal) { sendHeard(); return; }
     clearTimeout(silenceTimer);  // still talking: wait for a ~1.2 s pause, then finish
     silenceTimer = setTimeout(() => { try { r.stop(); } catch (err) { /* already stopped */ } }, 1200);

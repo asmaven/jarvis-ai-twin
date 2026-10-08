@@ -20,7 +20,7 @@ the chat honest.
 | **Grounding** | Jarvis answers only from a private knowledge base of my career. If something isn't covered, it says so and points to me instead of guessing. |
 | **Guardrails** | Rules for tone, length (two lines max), facts that apply only in certain contexts, and topics it politely declines. |
 | **AI judge** | A second model checks each answer claim by claim against the knowledge base and flags anything invented, misused, or off-limits. |
-| **Release gate** | A test suite (29 questions and growing) runs before every deploy. If one fails, nothing ships, and the deploy script confirms the live site serves the version that passed. |
+| **Release gate** | A hand-picked golden set of 29 questions runs before every deploy. If one fails, nothing ships, and the deploy script confirms the live site serves the version that passed. |
 | **Learning loop** | Real conversations are logged privately (visitors are anonymized) and reviewed by the judge. Every problem becomes a new test, and fixes go into the knowledge base or rules, not the model. |
 
 ## What I learned
