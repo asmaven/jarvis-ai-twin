@@ -40,6 +40,13 @@ from grounding import MAX_WORDS, GroundingJudge, load_sources, prompt_version, w
 def score(case: dict, answer: str) -> list:
     text = answer.lower()
     problems = []
+    if not answer.strip():
+        problems.append("blank answer")
+    # fallback lines app.py shows when the model returns nothing or hits MAX_TOKENS
+    if "lost my train of thought" in text:
+        problems.append("blank answer (fallback shown)")
+    if "that ran long, so i'll stop there" in text:
+        problems.append("cut off at the token limit")
     for group in case.get("must_include_any", []):
         if not any(p.lower() in text for p in group):
             problems.append(f"missing one of {group}")

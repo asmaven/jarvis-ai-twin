@@ -21,7 +21,7 @@ the chat honest.
 | **Guardrails** | Rules for tone, length (two lines max), facts that apply only in certain contexts, and topics it politely declines. |
 | **AI judge** | A second model checks each answer claim by claim against the knowledge base and flags anything invented, misused, or off-limits. |
 | **Release gate** | A hand-picked golden set of 29 questions runs before every deploy. If one fails, nothing ships, and the deploy script confirms the live site serves the version that passed. |
-| **Learning loop** | Real conversations are logged privately (visitors are anonymized) and reviewed by the judge. Every problem becomes a new test, and fixes go into the knowledge base or rules, not the model. |
+| **Learning loop** | Real conversations are logged privately (visitors are anonymized) and reviewed by the judge every day. I hand-pick which flagged answers become new tests, and fixes go into the knowledge base or rules, not the model. |
 
 ## What I learned
 

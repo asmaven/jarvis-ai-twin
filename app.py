@@ -45,9 +45,9 @@ CONVO_REPO = os.getenv("TWIN_LOG_REPO", "")  # e.g. ayazshaik/jarvis-conversatio
 # restarts; otherwise IDs only link visits within one server run.
 LOG_SALT = os.getenv("TWIN_LOG_SALT") or secrets.token_hex(16)
 
-MODEL = "claude-opus-5"  # Jarvis's answers. (The grounding judge in tools/grounding.py has its own JUDGE_MODEL.)
+MODEL = os.getenv("TWIN_MODEL", "claude-opus-5")  # Jarvis's answers. (The grounding judge in tools/grounding.py has its own JUDGE_MODEL.)
 # Opus 5.5 was trialed 2026-10-01: no cheaper per visit (it thinks more), slower, and declined "biggest weakness".
-MAX_TOKENS = 200        # backstop; persona.md keeps answers to 2 lines
+MAX_TOKENS = int(os.getenv("TWIN_MAX_TOKENS", "300"))  # backstop; persona.md keeps answers to 2 lines (longest seen: 185)
 MAX_TURNS = 20            # history kept per request
 MAX_USER_CHARS = 2000     # per message
 RATE_LIMIT = 30           # requests per IP ...
@@ -61,6 +61,9 @@ VOICE_PATH = Path(os.getenv("TWIN_VOICE_PATH", ROOT / "voices" / "en_US-hfc_male
 MAX_TTS_CHARS = 600       # per sentence/chunk sent to /api/tts
 
 REFUSAL_TEXT = "Sorry, I can't help with that one. Please reach out to Ayaz directly on LinkedIn."
+# Shown when the model returns no text, or is cut off at MAX_TOKENS. evals/run_eval.py fails any answer containing these.
+BLANK_TEXT = "Sorry, I lost my train of thought there. Please ask again, or reach out to Ayaz directly on LinkedIn."
+CUT_OFF_TEXT = "… That ran long, so I'll stop there. Ask me about any part for more."
 
 MODE_INSTRUCTIONS = {
     "public": (
@@ -463,6 +466,12 @@ async def chat(req: ChatRequest, request: Request):
             if final.stop_reason == "refusal":
                 said.append(f"\n\n{REFUSAL_TEXT}")
                 yield said[-1]
+            elif not "".join(said).strip():
+                said.append(BLANK_TEXT)
+                yield said[-1]
+            elif final.stop_reason == "max_tokens":
+                said.append(f" {CUT_OFF_TEXT}")
+                yield said[-1]
             usage = final.usage
             record.update(
                 stop_reason=final.stop_reason,
@@ -484,6 +493,12 @@ async def chat(req: ChatRequest, request: Request):
         except anthropic.APIStatusError as e:
             logging.exception("Claude API error")
             record["error"] = f"api_{e.status_code}"
+            said.append("Something went wrong on my side. Please try again.")
+            yield said[-1]
+        except Exception:
+            # anything unexpected still gets a reply instead of silence
+            logging.exception("Unexpected error while answering")
+            record["error"] = "unexpected"
             said.append("Something went wrong on my side. Please try again.")
             yield said[-1]
         finally:
